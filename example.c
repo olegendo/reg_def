@@ -89,6 +89,20 @@ mem_reg16 (TCR0, 0xFFD80010
 // the WDT registers need to be written as 16-bit with the high-byte set to
 // 0x5A or 0xA5
 
+enum wdt_cks_t
+{
+  wdt_cks_1_32 = 0b000,
+  wdt_cks_1_64 = 0b001,
+  wdt_cks_1_128 = 0b010,
+  wdt_cks_1_256 = 0b011,
+  wdt_cks_1_512 = 0b100,
+  wdt_cks_1_1024 = 0b101,
+  wdt_cks_1_2048 = 0b110,
+  wdt_cks_1_4096 = 0b111
+};
+
+
+#if 0
 enum { WTCNT_ADDR = 0xFFC00008 };
 inline void set_WTCNT_raw_reg_value (uint8_t v) { *(volatile uint16_t*)0xFFC00008 = v | 0x5A00; }
 inline uint8_t get_WTCNT_raw_reg_value (void) { return *(volatile uint8_t*)0xFFC00008; }
@@ -102,18 +116,6 @@ inline void set_WTCSR_raw_reg_value (uint8_t v) { *(volatile uint16_t*)0xFFC0000
 inline uint8_t get_WTCSR_raw_reg_value (void) { return *(volatile uint8_t*)0xFFC0000C; }
 inline void rmw_WTCSR (uint8_t a, uint8_t o) { set_WTCSR_raw_reg_value ((get_WTCSR_raw_reg_value () & a) | o); }
 
-enum wdt_cks_t
-{
-  wdt_cks_1_32 = 0b000,
-  wdt_cks_1_64 = 0b001,
-  wdt_cks_1_128 = 0b010,
-  wdt_cks_1_256 = 0b011,
-  wdt_cks_1_512 = 0b100,
-  wdt_cks_1_1024 = 0b101,
-  wdt_cks_1_2048 = 0b110,
-  wdt_cks_1_4096 = 0b111
-};
-
 expand_define_reg (WTCSR, uint8_t
   , reg_bits (tme, 7, 7, bool)
   , reg_bits (wt_it, 6, 6, bool)
@@ -122,7 +124,28 @@ expand_define_reg (WTCSR, uint8_t
   , reg_bits (iovf, 3, 3, bool)
   , reg_bits (cks, 2, 0, enum wdt_cks_t)
 )
+#endif
 
+
+#define wdt_reg8(reg_name, addr, write_magic_value, ...) \
+enum { reg_name ## _ADDR = addr }; \
+inline void set_ ## reg_name ## _raw_reg_value (uint8_t v) { *(volatile uint16_t*)addr = v | write_magic_value; } \
+inline uint8_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint8_t*)addr; } \
+inline void rmw_ ## reg_name (uint8_t a, uint8_t o) { *(volatile uint8_t*)addr = ((*(volatile uint8_t*)addr) & a) | o; } \
+expand_define_reg(reg_name, uint8_t, __VA_ARGS__)
+
+wdt_reg8 (WTCNT, 0xFFC00008, 0x5A00
+  , reg_bits (counter, 7, 0, uint8_t)
+)
+
+wdt_reg8 (WTCSR, 0xFFC0000C, 0xA500
+  , reg_bits (tme, 7, 7, bool)
+  , reg_bits (wt_it, 6, 6, bool)
+  , reg_bits (rsts, 5, 5, bool)
+  , reg_bits (wovf, 4, 4, bool)
+  , reg_bits (iovf, 3, 3, bool)
+  , reg_bits (cks, 2, 0, enum wdt_cks_t)
+)
 
 // ------------------------------------------------------------------------
 // example
