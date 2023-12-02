@@ -1,8 +1,100 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "reg_def.h"
+
+// ------------------------------------------------------------------------
+// simple memory mapped register access
+
+#define mem_reg8(reg_name, addr, ...) \
+enum { reg_name ## _ADDR = addr }; \
+inline void set_ ## reg_name ## _raw_reg_value (uint8_t v) { *(volatile uint8_t*)addr = v; } \
+inline uint8_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint8_t*)addr; } \
+inline void rmw_ ## reg_name (uint8_t a, uint8_t o) { *(volatile uint8_t*)addr = ((*(volatile uint8_t*)addr) & a) | o; } \
+expand_define_reg(reg_name, uint8_t, __VA_ARGS__)
+
+#define mem_reg16(reg_name, addr, ...) \
+enum { reg_name ## _ADDR = addr }; \
+inline void set_ ## reg_name ## _raw_reg_value (uint16_t v) { *(volatile uint16_t*)addr = v; } \
+inline uint16_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint16_t*)addr; } \
+inline void rmw_ ## reg_name(uint16_t a, uint16_t o) { *(volatile uint16_t*)addr = ((*(volatile uint16_t*)addr) & a) | o; } \
+expand_define_reg(reg_name, uint16_t, __VA_ARGS__)
+
+#define mem_reg32(reg_name, addr, ...) \
+enum { reg_name ## _ADDR = addr }; \
+inline void set_ ## reg_name ## _raw_reg_value (uint32_t v) { *(volatile uint32_t*)addr = v; } \
+inline uint32_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint32_t*)addr; } \
+inline void rmw_ ## reg_name(uint32_t a, uint32_t o) { *(volatile uint32_t*)addr = ((*(volatile uint32_t*)addr) & a) | o; } \
+expand_define_reg(reg_name, uint32_t, __VA_ARGS__)
+
+
+// ------------------------------------------------------------------------
+// SH7091 TMU0 register description
+
+mem_reg8 (TOCR, 0xFFD80000
+  , reg_bits (reserved, 7, 1, uint8_t)
+  , reg_bits (tcoe, 0, 0, bool)
+)
+
+mem_reg8 (TSTR, 0xFFD80004
+  , reg_bits (reserved, 7, 3, uint8_t)
+  , reg_bits (str2, 2, 2, bool)
+  , reg_bits (str1, 1, 1, bool)
+  , reg_bits (str0, 0, 0, bool)
+)
+
+mem_reg32 (TCOR0, 0xFFD80008
+  , reg_bits (value, 31, 0, uint32_t)
+)
+
+mem_reg32 (TCNT0, 0xFFD8000C
+  , reg_bits (value, 31, 0, uint32_t)
+)
+
+enum tcr_ckeg_t
+{
+  ckeg_count_capture_rising_edge = 0b00,
+  ckeg_count_capture_falling_edge = 0b01,
+  ckeg_count_capture_any_edge = 0b10
+};
+
+enum tcr_tpsc_t
+{
+  tpsc_p_4 = 0b000,
+  tpsc_p_16 = 0b001,
+  tpsc_p_64 = 0b010,
+  tpsc_p_256 = 0b011,
+  tpsc_p_1024 = 0b100,
+  // tpsc_reserved = 0b101
+  tpsc_rtc_clock = 0b110,
+  tpsc_ext_clock = 0b111
+};
+
+mem_reg16 (TCR0, 0xFFD80010
+  , reg_bits (reserved0, 15, 9, uint8_t)
+  , reg_bits (unf, 8, 8, bool)
+  , reg_bits (reserved1, 7, 6, uint8_t)
+  , reg_bits (unie, 5, 5, bool)
+  
+  , reg_bits (ckeg1, 4, 3, enum tcr_ckeg_t)
+
+  , reg_bits (tpsc2, 2, 0, enum tcr_tpsc_t)
+)
+
+// ------------------------------------------------------------------------
+
+
+// ------------------------------------------------------------------------
+// example
+
+void start_tmu0 (uint32_t count)
+{
+  reset_reg (TCNT0, (value, count));
+  set_reg (TSTR, (str0, true));
+}
+
 
 int main (void)
 {
