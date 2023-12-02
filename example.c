@@ -84,6 +84,44 @@ mem_reg16 (TCR0, 0xFFD80010
 )
 
 // ------------------------------------------------------------------------
+// SH7091 WDT registers
+
+// the WDT registers need to be written as 16-bit with the high-byte set to
+// 0x5A or 0xA5
+
+enum { WTCNT_ADDR = 0xFFC00008 };
+inline void set_WTCNT_raw_reg_value (uint8_t v) { *(volatile uint16_t*)0xFFC00008 = v | 0x5A00; }
+inline uint8_t get_WTCNT_raw_reg_value (void) { return *(volatile uint8_t*)0xFFC00008; }
+inline void rmw_WTCNT (uint8_t a, uint8_t o) { set_WTCNT_raw_reg_value ((get_WTCNT_raw_reg_value () & a) | o); }
+
+expand_define_reg (WTCNT, uint8_t
+  , reg_bits (counter, 7, 0, uint8_t)
+)
+
+inline void set_WTCSR_raw_reg_value (uint8_t v) { *(volatile uint16_t*)0xFFC0000C = v | 0xA500; }
+inline uint8_t get_WTCSR_raw_reg_value (void) { return *(volatile uint8_t*)0xFFC0000C; }
+inline void rmw_WTCSR (uint8_t a, uint8_t o) { set_WTCSR_raw_reg_value ((get_WTCSR_raw_reg_value () & a) | o); }
+
+enum wdt_cks_t
+{
+  wdt_cks_1_32 = 0b000,
+  wdt_cks_1_64 = 0b001,
+  wdt_cks_1_128 = 0b010,
+  wdt_cks_1_256 = 0b011,
+  wdt_cks_1_512 = 0b100,
+  wdt_cks_1_1024 = 0b101,
+  wdt_cks_1_2048 = 0b110,
+  wdt_cks_1_4096 = 0b111
+};
+
+expand_define_reg (WTCSR, uint8_t
+  , reg_bits (tme, 7, 7, bool)
+  , reg_bits (wt_it, 6, 6, bool)
+  , reg_bits (rsts, 5, 5, bool)
+  , reg_bits (wovf, 4, 4, bool)
+  , reg_bits (iovf, 3, 3, bool)
+  , reg_bits (cks, 2, 0, enum wdt_cks_t)
+)
 
 
 // ------------------------------------------------------------------------
@@ -93,6 +131,12 @@ void start_tmu0 (uint32_t count)
 {
   reset_reg (TCNT0, (value, count));
   set_reg (TSTR, (str0, true));
+}
+
+void start_wdt (void)
+{
+  set_reg (WTCSR, (cks, wdt_cks_1_256));
+  reset_reg (WTCNT, (counter, 0xFF));
 }
 
 
