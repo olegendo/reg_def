@@ -303,7 +303,11 @@ inline type get_ ## reg ## _value_ ## field (reg_type val) \
 #define expand_reg_bits_enum_1(...)
 
 #define expand_reg_bits_enum_0(reg_name, reg_raw_type, ...)\
-enum reg_name ## _bits { pp_for_each_i (expand_reg_bits_for_enum, (reg_name, reg_raw_type), __VA_ARGS__) }; \
+enum reg_name ## _bits \
+{ \
+  reg_name ## _all_bits = make_bitmask(reg_raw_type, sizeof(reg_raw_type)*8), \
+  pp_for_each_i (expand_reg_bits_for_enum, (reg_name, reg_raw_type), __VA_ARGS__) \
+};
 
 #define expand_reg_bits_enum_(reg_name, reg_raw_type, is_empty, ...) expand_reg_bits_enum_ ## is_empty (reg_name, reg_raw_type, __VA_ARGS__)
 #define expand_reg_bits_enum__(...) expand_reg_bits_enum_ (__VA_ARGS__)
@@ -333,7 +337,7 @@ enum reg_name ## _bits { pp_for_each_i (expand_reg_bits_for_enum, (reg_name, reg
 
 
 #define set_reg(reg, ...) rmw_ ## reg ( \
-  ~(0u pp_for_each_i (expand_set_multi_get_mask, reg, __VA_ARGS__)), \
+  reg ## _all_bits & ~(0u pp_for_each_i (expand_set_multi_get_mask, reg, __VA_ARGS__)), \
   (0u pp_for_each_i (expand_set_all, reg, __VA_ARGS__)))
 
 #define get_reg_n__1(reg,field,...) get_ ## reg ## _ ## field ()
