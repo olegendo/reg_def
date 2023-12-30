@@ -325,10 +325,11 @@ enum reg_name ## _bits \
 #define expand_set_all__(...) __VA_ARGS__
 #define expand_set_all(reg, x) expand_set_all_ (reg, expand_set_all__  x)
 
-#define reset_reg(reg, ...) set_ ## reg ## _raw_reg_value (0 pp_for_each_i (expand_set_all, reg, __VA_ARGS__ ))
+#define reset_reg_1(reg, ...) set_ ## reg ## _raw_reg_value (0 pp_for_each_i (expand_set_all, reg, __VA_ARGS__ ))
+#define reset_reg(reg, ...) reset_reg_1(reg, __VA_ARGS__)
 
-#define reset_reg_raw(reg, val) set_ ## reg ## _raw_reg_value (val)
-
+#define reset_reg_raw_1(reg, val) set_ ## reg ## _raw_reg_value (val)
+#define reset_reg_raw(reg, ...) reset_reg_raw_1(reg, __VA_ARGS__)
 
 #define expand_set_multi_get_mask___(reg, field, val) | reg ## _ ## field ## _mask
 #define expand_set_multi_get_mask_(...) expand_set_multi_get_mask___ (__VA_ARGS__)
@@ -336,9 +337,11 @@ enum reg_name ## _bits \
 #define expand_set_multi_get_mask(reg, x) expand_set_multi_get_mask_ (reg, expand_set_multi_get_mask__  x)
 
 
-#define set_reg(reg, ...) rmw_ ## reg ( \
+#define set_reg_1(reg, ...) rmw_ ## reg ( \
   reg ## _all_bits & ~(0u pp_for_each_i (expand_set_multi_get_mask, reg, __VA_ARGS__)), \
   (0u pp_for_each_i (expand_set_all, reg, __VA_ARGS__)))
+
+#define set_reg(reg, ...) set_reg_1 (reg, __VA_ARGS__)
 
 #define get_reg_n__1(reg,field,...) get_ ## reg ## _ ## field ()
 #define get_reg_n__0(reg,...) get_ ## reg ## _raw_reg_value ()
