@@ -84,6 +84,7 @@ available access methods
 
 
   reset_reg ( < reg name >, (raw_reg_value, < value >) )
+  reset_reg ( < reg name >, < value > )
 
      overwrite the hardware register with the specified raw value.
 
@@ -149,9 +150,18 @@ example register write access
     (ck_sel,        adc_ck_pos)
   );
 
-  reset_reg (ADC_B_CONTROL,
-    (raw_reg_value, 0x11)
-  );
+
+  reset_reg (ADC_B_CONTROL, (raw_reg_value, 0x11));
+
+  reset_reg (ADC_B_CONTROL, 0x11);
+
+  reset_reg (ADC_B_CONTROL, make_reg_value (
+    (start_running, true),
+    (mode,          adc_b_continuous),
+    (en_interrupt,  false),
+    (bias_adj,      adc_bias_25u),
+    (ck_sel,        adc_ck_pos)
+  ))
 
 
 // partically set one or more register field.
@@ -319,11 +329,31 @@ enum reg_name ## _bits \
   pp_for_each_i (expand_reg_bits_funcs, (reg_name, reg_raw_type), __VA_ARGS__) \
   inline reg_raw_type make_ ## reg_name ## _raw_reg_value (reg_raw_type v) { return v; }
 
+// expand '(name, value)' or 'value' that came from
+//     reset_reg (field, value)
+// or
+//     reset_reg (value)
 
-#define expand_set_all___(reg, field, val) | make_ ## reg ## _ ## field (val)
-#define expand_set_all_(...) expand_set_all___ (__VA_ARGS__)
-#define expand_set_all__(...) __VA_ARGS__
-#define expand_set_all(reg, x) expand_set_all_ (reg, expand_set_all__  x)
+// expand_set_all_expand_value_pair
+// invoked with '(field, value)':
+//      -> expand_set_all_expand_value_pair (field, value) -> field, value
+//      -> pp_args_size will evaluate to '2'
+//
+// invoked with 'value':
+//      -> expand_set_all_expand_value_pair 123 -> expand_set_all_expand_value_pair 123
+//      -> pp_args_size will evaluate to '1' (the following 123 value is garbage and will be ignored)
+#define expand_set_all_expand_value_pair(...) __VA_ARGS__
+
+#define expand_set_all__2__(reg, field, val)  | make_ ## reg ## _ ## field (val)
+#define expand_set_all__2_(...) expand_set_all__2__ (__VA_ARGS__)
+#define expand_set_all__2(reg, val) expand_set_all__2_ (reg, expand_set_all_expand_value_pair val)
+
+#define expand_set_all__1(reg, val) | make_ ## reg ## _raw_reg_value (val)
+
+#define expand_set_all__n(reg, n, ...) pp_concat (expand_set_all__, n) (reg, __VA_ARGS__)
+#define expand_set_all_(reg, ...) expand_set_all__n (reg, __VA_ARGS__)
+#define expand_set_all(reg, x) expand_set_all_ (reg, pp_args_size (expand_set_all_expand_value_pair x), x)
+
 
 #define reset_reg_1(reg, ...) set_ ## reg ## _raw_reg_value (0 pp_for_each_i (expand_set_all, reg, __VA_ARGS__ ))
 #define reset_reg(reg, ...) reset_reg_1(reg, __VA_ARGS__)
