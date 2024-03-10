@@ -1,20 +1,20 @@
 /*
-Copyright (c) 2023 Oleg Endo
+Copyright (c) 2023-2024 Oleg Endo
 
 see also LICENSE file.
 
 
-C preprocessor based register definition utilities which should help in
-describing a larger MCU in a homogeneous style, with automatic code generation
-for register access and manipulation.
+C preprocessor based register definition utilities which can help
+describing a larger MCU register set in a homogeneous style, with automatic
+code generation for register access and manipulation.
 
 an alternative to all of this would be using structs and bitfields and designated
-initializers, but SDCC does not support passing structs as arguments or return
-values, even if those can be evaluated at compile time.
-
-since SDCC is not a very sophisticated, try doing as many things as possible
-in the preprocessor as that guarantees compile-time evaluation.
-
+initializers, but at the time of the creation of this library, SDCC did not
+support passing structs as arguments or return values.  although that has been
+improved, the generated code might still be suboptimal, since SDCC's optimization
+framework is not very sophisticated.  to mitigate that, this library tries to
+do as many things as possible using the C preprocessor, which guarantees
+compile-time evaluation.
 
 
 example register definition
@@ -23,6 +23,8 @@ example register definition
 xfr_reg8 is a macro that expands the register definition by using the 
 expand_define_reg macro.  it implements only raw value register read and
 write functions.
+
+using that macro we can declare a register and its fields as follows:
 
 xfr_reg8 (ADC_B_CONTROL, 0xFF0E,
   reg_bits (start_running,   7, 7, bool),         // (field name, end bit, start bit, extracted type)
@@ -37,7 +39,8 @@ xfr_reg8 (ADC_B_CONTROL, 0xFF0E,
 a list of 'reg_bits' declarations is used to describe a bitfield in the register.
 the declaration format is chosen to be similar to what can be commonly found in
 MCU data sheets.  it will automatically generate functions to access that field,
-like in this case
+like in this case:
+
    enum ADC_B_CONTROL_bits
    {
      ADC_B_CONTROL_start_running_value_mask = < bit mask value >,
@@ -55,14 +58,14 @@ like in this case
    ...
 
 these are then accessible via a generic get/set/reset wrapper macros, to make
-it look more functional.  these generic warpper macros can also be used to
+the use look more functional.  these generic warpper macros can also be used to
 access special case implementations of register access.  the register
 implementation just has to follow the above naming scheme.
 
 the enum is not really required but reduces the compile time significantly
 on SDCC.
 
-in order to represent scattered bitfields easier to deal with, 'reg_bits_2'
+in order to represent scattered bitfields, 'reg_bits_2'
 can be used to define a split bitfield:
 
 xfr_reg8 (EXAMPLE_REG, 0xFF00,
@@ -92,7 +95,7 @@ available access methods
   reset_reg ( < reg name >, (field, field value) [, (field, field value), ... ] )
 
      construct a register raw value from the specified fields and their values,
-     then overwrite the hardware register with the resulting raw value.
+     then overwrite the hardware register with the resulting new raw value.
 
 
   set_reg ( < reg name >, (field, field value) [, (field, field value), ... ] )
@@ -105,19 +108,19 @@ available access methods
   make_reg_value ( < reg name >, (field, field value) [, (field, field value), ... ] )
 
      construct a register raw value from the specified fields and their values.
-     does not modify the hardware register.
+     does not read nor modify the hardware register.
 
 
   get_reg_value (value, < reg name > [, field ] )
 
      extract the specified field from the value.
-     does not modify the hardware register
+     does not read nor modify the hardware register
 
 
   set_reg_value (value, < reg name >, (field, field value) [, (field, field value), ... ] > )
 
      modify the specified value variable by setting the specified fields to their
-     respective values.  does not modify the hardware register.
+     respective values.  does not read nor modify the hardware register.
 
 
 example register read access
@@ -394,6 +397,7 @@ enum reg_name ## _bits \
              | (0u pp_for_each_i (expand_set_all, reg, __VA_ARGS__)); } while (0)
 
 
+#if 0
 // FIXME: problem of nested expansion of pp_for_each / pp_for_each_i
 // for some weird reason, the nested pp_for_each_i that comes out of 'reset_reg'
 // it seems to be related to the way arguments are expanded and concatenated.
@@ -417,6 +421,7 @@ inline void set_ ## reg_name ## _raw_reg_value (raw_reg_type val) \
 { \
   _pp_for_each_i (expand_set_combined_subreg, (raw_reg_type, val), __VA_ARGS__) \
 }
+#endif
 
 
 #endif // includeguard_reg_def_h_includeguard
