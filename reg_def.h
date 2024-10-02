@@ -105,6 +105,12 @@ available access methods
      from the register.
 
 
+  rmw_reg ( < reg name>, AND mask value, OR mask value )
+
+     read-modify the hardware register by reading the register, applying the
+     raw AND mask value then the OR mask value and writing it back.
+
+
   make_reg_value ( < reg name >, (field, field value) [, (field, field value), ... ] )
 
      construct a register raw value from the specified fields and their values.
@@ -179,6 +185,27 @@ example register write access
   set_reg (ADC_B_CONTROL,
     (start_running, true)
   );
+
+implementing low level register access
+--------------------------------------
+
+the high level register get / set / reset functions are translated to the following
+low-level functions to access a register:
+
+- void set_< reg name >_raw_reg_value (<register data type> val)
+
+    overwrite the register contents with the specified value.
+
+
+- <register data type> get_< reg name >_raw_reg_value (void)
+
+   read and return the register contents
+
+
+- void rmw_< reg name > (<register data type> and_mask, <register data type> or_mask)
+
+   read the register value, apply the AND mask, then the OR mask, then write
+   the resulting value back to the register.
 
 */
 
@@ -381,6 +408,9 @@ enum reg_name ## _bits \
 #define get_reg_n_(n, ...) get_reg_n__ ## n (__VA_ARGS__)
 #define get_reg_n(n, ...) get_reg_n_(n, __VA_ARGS__)
 #define get_reg(reg, ...) get_reg_n ( pp_args_size(__VA_ARGS__), reg, __VA_ARGS__)
+
+
+#define rmw_reg(reg, and_mask, or_mask) rmw_ ## reg (and_mask, or_mask)
 
 #define make_reg_value(reg, ...) (0 pp_for_each_i (expand_set_all, reg, __VA_ARGS__ ))
 
