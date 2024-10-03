@@ -254,7 +254,7 @@ low-level functions to access a register:
 #define expand_reg_bits_funcs____6(reg, reg_type, field, type, high_bit, low_bit) \
 inline reg_type make_ ## reg ## _ ## field (type v) \
 { \
-  return ((reg_type)v << (low_bit)) & reg ## _ ## field ## _mask;\
+  return (reg_type)(v & (reg ## _ ## field ## _value_mask)) << (low_bit); \
 }\
 inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
 {\
@@ -264,10 +264,6 @@ inline void set_ ## reg ## _ ## field (type v)\
 {\
   set_ ## reg ## _raw_reg_value (set1_ ## reg ## _ ## field (v, get_ ## reg ## _raw_reg_value ()));\
 }\
-inline reg_type get_ ## reg ## _ ## field ## _mask (void)\
-{\
-  return reg ## _ ## field ## _mask;\
-} \
 inline type get_ ## reg ## _ ## field (void) \
 { \
   static_assert ((high_bit) >= (low_bit), "high bit < low bit"); \
@@ -299,10 +295,6 @@ inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
 inline void set_ ## reg ## _ ## field (type v)\
 {\
   set_ ## reg ## _raw_reg_value (set1_ ## reg ## _ ## field (v, get_ ## reg ## _raw_reg_value ()));\
-}\
-inline reg_type get_ ## reg ## _ ## field ## _mask (void)\
-{\
-  return reg ## _ ## field ## _mask;\
 }\
 inline type get_ ## reg ## _ ## field (void) \
 { \
