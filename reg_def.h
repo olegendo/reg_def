@@ -281,6 +281,36 @@ instance parameter is whatever the user picks:
 
 #include "pp_for_each.h"
 
+// inline storage class for the per-field helpers and the user-supplied
+// raw_reg_value / rmw functions in device-specific macros.
+//
+//   SDCC:  plain 'inline' inlines at the call site without emitting a
+//          standalone copy in the TU.  'static inline' inlines AND emits
+//          a per-TU copy, which is a code-size regression.  prefer plain
+//          'inline'.
+//
+//   GCC:   plain 'inline' (C99) inlines at the call site but does NOT emit
+//          an out-of-line definition unless backed by a separate 'extern
+//          inline' declaration.  at -O0 nothing is inlined, so unresolved
+//          calls hit the linker.  'static inline' inlines if able, otherwise
+//          emits a private per-TU copy that the linker drops if unused.
+//          prefer 'static inline' so each TU is self-contained at any
+//          optimization level.
+//
+// device-specific macros (e.g. aw9523b_reg8, mem_reg8, ...) should also use
+// reg_def_inline for the symbols they mint, so the same compile guarantees
+// extend to the user-supplied set_<reg>_raw_reg_value / rmw_<reg> /
+// get_<reg>_raw_reg_value functions.
+#ifdef __SDCC
+  #define reg_def_inline inline
+#else
+  #ifdef __cplusplus
+    #define reg_def_inline inline
+  #else
+    #define reg_def_inline static inline
+  #endif
+#endif
+
 #define make_bitmask(t, n) (t)((uint64_t)(1ll << (n)) - 1ll)
 
 #define reg_bits(enum_name, high_bit, low_bit, type) (enum_name, type, high_bit, low_bit)
@@ -321,15 +351,15 @@ instance parameter is whatever the user picks:
 // independent of whether the device file provides the plain or _1 form (or
 // both) of the low-level access functions.
 #define expand_reg_bits_funcs____6(reg, reg_type, field, type, high_bit, low_bit) \
-inline reg_type make_ ## reg ## _ ## field (type v) \
+reg_def_inline reg_type make_ ## reg ## _ ## field (type v) \
 { \
   return (reg_type)(v & (reg ## _ ## field ## _value_mask)) << (low_bit); \
 }\
-inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
+reg_def_inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
 {\
   return (r & ~( reg ## _ ## field ## _mask)) | make_ ## reg ## _ ## field (v); \
 }\
-inline type get_ ## reg ## _value_ ## field (reg_type val) \
+reg_def_inline type get_ ## reg ## _value_ ## field (reg_type val) \
 { \
   static_assert ((high_bit) >= (low_bit), "high bit < low bit"); \
   static_assert (( (high_bit) - (low_bit) + 1) <= sizeof (reg_type) * 8, "high bit - low bit > register type bits"); \
@@ -339,18 +369,18 @@ inline type get_ ## reg ## _value_ ## field (reg_type val) \
 
 
 #define expand_reg_bits_funcs____8(reg, reg_type, field, type, high_bit0, low_bit0, high_bit1, low_bit1) \
-inline reg_type make_ ## reg ## _ ## field (type v) \
+reg_def_inline reg_type make_ ## reg ## _ ## field (type v) \
 {\
   const reg_type vv = (reg_type)v; \
   return (type)0 \
     | (((vv & reg ## _ ## field ## _value_mask0) >> ((high_bit1) - (low_bit1) + 1)) << (low_bit0)) \
     | (((vv & reg ## _ ## field ## _value_mask1) >> (0)) << (low_bit1)); \
 }\
-inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
+reg_def_inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
 {\
   return (r & ~( reg ## _ ## field ## _mask)) | make_ ## reg ## _ ## field (v); \
 }\
-inline type get_ ## reg ## _value_ ## field (reg_type val) \
+reg_def_inline type get_ ## reg ## _value_ ## field (reg_type val) \
 { \
   static_assert ((high_bit0) >= (low_bit0), "high_bit0 >= low_bit0"); \
   static_assert ((high_bit1) >= (low_bit1), "high_bit1 >= low_bit1"); \
@@ -391,8 +421,8 @@ enum reg_name ## _bits \
 #define expand_define_reg(reg_name, reg_raw_type, ...) \
   expand_reg_bits_enum (reg_name, reg_raw_type, __VA_ARGS__) \
   pp_for_each_i (expand_reg_bits_funcs, (reg_name, reg_raw_type), __VA_ARGS__) \
-  inline reg_raw_type make_ ## reg_name ## _raw_reg_value (reg_raw_type v) { return v; } \
-  inline reg_raw_type get_ ## reg_name ## _value_raw_reg_value (reg_raw_type v) { return v; }
+  reg_def_inline reg_raw_type make_ ## reg_name ## _raw_reg_value (reg_raw_type v) { return v; } \
+  reg_def_inline reg_raw_type get_ ## reg_name ## _value_raw_reg_value (reg_raw_type v) { return v; }
 
 // FIXME: 'get_ ## reg_name ## _value_raw_reg_value' above is only for backwards compatibility
 //        for get_reg (REG, raw_reg_value) and so on.
@@ -533,7 +563,7 @@ enum reg_name ## _bits \
 #define expand_set_combined_subreg(val_type, subreg) expand_set_combined_subreg_1(expand_set_combined_subreg__ val_type, expand_set_combined_subreg__ subreg)
 
 #define combined_reg(reg_name, raw_reg_type, field, ...) \
-inline void set_ ## reg_name ## _raw_reg_value (raw_reg_type val) \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value (raw_reg_type val) \
 { \
   _pp_for_each_i (expand_set_combined_subreg, (raw_reg_type, val), __VA_ARGS__) \
 }

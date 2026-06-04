@@ -10,23 +10,23 @@
 
 #define mem_reg8(reg_name, addr, ...) \
 enum { reg_name ## _ADDR = addr }; \
-inline void set_ ## reg_name ## _raw_reg_value (uint8_t v) { *(volatile uint8_t*)addr = v; } \
-inline uint8_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint8_t*)addr; } \
-inline void rmw_ ## reg_name (uint8_t a, uint8_t o) { *(volatile uint8_t*)addr = ((*(volatile uint8_t*)addr) & a) | o; } \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value (uint8_t v) { *(volatile uint8_t*)addr = v; } \
+reg_def_inline uint8_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint8_t*)addr; } \
+reg_def_inline void rmw_ ## reg_name (uint8_t a, uint8_t o) { *(volatile uint8_t*)addr = ((*(volatile uint8_t*)addr) & a) | o; } \
 expand_define_reg(reg_name, uint8_t, __VA_ARGS__)
 
 #define mem_reg16(reg_name, addr, ...) \
 enum { reg_name ## _ADDR = addr }; \
-inline void set_ ## reg_name ## _raw_reg_value (uint16_t v) { *(volatile uint16_t*)addr = v; } \
-inline uint16_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint16_t*)addr; } \
-inline void rmw_ ## reg_name(uint16_t a, uint16_t o) { *(volatile uint16_t*)addr = ((*(volatile uint16_t*)addr) & a) | o; } \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value (uint16_t v) { *(volatile uint16_t*)addr = v; } \
+reg_def_inline uint16_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint16_t*)addr; } \
+reg_def_inline void rmw_ ## reg_name(uint16_t a, uint16_t o) { *(volatile uint16_t*)addr = ((*(volatile uint16_t*)addr) & a) | o; } \
 expand_define_reg(reg_name, uint16_t, __VA_ARGS__)
 
 #define mem_reg32(reg_name, addr, ...) \
 enum { reg_name ## _ADDR = addr }; \
-inline void set_ ## reg_name ## _raw_reg_value (uint32_t v) { *(volatile uint32_t*)addr = v; } \
-inline uint32_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint32_t*)addr; } \
-inline void rmw_ ## reg_name(uint32_t a, uint32_t o) { *(volatile uint32_t*)addr = ((*(volatile uint32_t*)addr) & a) | o; } \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value (uint32_t v) { *(volatile uint32_t*)addr = v; } \
+reg_def_inline uint32_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint32_t*)addr; } \
+reg_def_inline void rmw_ ## reg_name(uint32_t a, uint32_t o) { *(volatile uint32_t*)addr = ((*(volatile uint32_t*)addr) & a) | o; } \
 expand_define_reg(reg_name, uint32_t, __VA_ARGS__)
 
 
@@ -129,9 +129,9 @@ expand_define_reg (WTCSR, uint8_t
 
 #define wdt_reg8(reg_name, addr, write_magic_value, ...) \
 enum { reg_name ## _ADDR = addr }; \
-inline void set_ ## reg_name ## _raw_reg_value (uint8_t v) { *(volatile uint16_t*)addr = v | write_magic_value; } \
-inline uint8_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint8_t*)addr; } \
-inline void rmw_ ## reg_name (uint8_t a, uint8_t o) { *(volatile uint8_t*)addr = ((*(volatile uint8_t*)addr) & a) | o; } \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value (uint8_t v) { *(volatile uint16_t*)addr = v | write_magic_value; } \
+reg_def_inline uint8_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint8_t*)addr; } \
+reg_def_inline void rmw_ ## reg_name (uint8_t a, uint8_t o) { *(volatile uint8_t*)addr = ((*(volatile uint8_t*)addr) & a) | o; } \
 expand_define_reg(reg_name, uint8_t, __VA_ARGS__)
 
 wdt_reg8 (WTCNT, 0xFFC00008, 0x5A00
