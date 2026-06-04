@@ -314,6 +314,12 @@ instance parameter is whatever the user picks:
 #define expand_reg_bits_for_enum(reg_name_type, x) expand_reg_bits_for_enum_(expand_reg_bits_for_enum__ reg_name_type, x)
 
 
+// expand_define_reg generates only value-only field helpers; the high-level
+// get_reg / set_reg / reset_reg / rmw_reg macros compose these helpers with
+// the user-provided _raw_reg_value functions instead of going through
+// per-field hardware-touching accessors.  this keeps expand_define_reg
+// independent of whether the device file provides the plain or _1 form (or
+// both) of the low-level access functions.
 #define expand_reg_bits_funcs____6(reg, reg_type, field, type, high_bit, low_bit) \
 inline reg_type make_ ## reg ## _ ## field (type v) \
 { \
@@ -323,17 +329,6 @@ inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
 {\
   return (r & ~( reg ## _ ## field ## _mask)) | make_ ## reg ## _ ## field (v); \
 }\
-inline void set_ ## reg ## _ ## field (type v)\
-{\
-  set_ ## reg ## _raw_reg_value (set1_ ## reg ## _ ## field (v, get_ ## reg ## _raw_reg_value ()));\
-}\
-inline type get_ ## reg ## _ ## field (void) \
-{ \
-  static_assert ((high_bit) >= (low_bit), "high bit < low bit"); \
-  static_assert (( (high_bit) - (low_bit) + 1) <= sizeof (reg_type) * 8, "high bit - low bit > register type bits"); \
-  static_assert (((high_bit) - (low_bit) + 1) <= sizeof (type) * 8, "high bit - low bit > field type bits"); \
-  return (type) (( get_ ## reg ## _raw_reg_value () >> (low_bit) ) & reg ## _ ## field ## _value_mask ); \
-} \
 inline type get_ ## reg ## _value_ ## field (reg_type val) \
 { \
   static_assert ((high_bit) >= (low_bit), "high bit < low bit"); \
@@ -354,22 +349,6 @@ inline reg_type make_ ## reg ## _ ## field (type v) \
 inline reg_type set1_ ## reg ## _ ## field (type v, reg_type r)\
 {\
   return (r & ~( reg ## _ ## field ## _mask)) | make_ ## reg ## _ ## field (v); \
-}\
-inline void set_ ## reg ## _ ## field (type v)\
-{\
-  set_ ## reg ## _raw_reg_value (set1_ ## reg ## _ ## field (v, get_ ## reg ## _raw_reg_value ()));\
-}\
-inline type get_ ## reg ## _ ## field (void) \
-{ \
-  static_assert ((high_bit0) >= (low_bit0), "high_bit0 >= low_bit0"); \
-  static_assert ((high_bit1) >= (low_bit1), "high_bit1 >= low_bit1"); \
-  static_assert ((low_bit0) > (low_bit1), "low_bit0 > low_bit1"); \
-  static_assert (((high_bit1) - (low_bit1) + 1) < sizeof (reg_type) * 8); \
-  static_assert (((high_bit1) - (low_bit1) + 1) < sizeof (type) * 8); \
-  const reg_type r = get_ ## reg ## _raw_reg_value (); \
-  const reg_type r0 = (r >> (low_bit0)) << ((high_bit1) - (low_bit1) + 1); \
-  const reg_type r1 = (r >> (low_bit1)); \
-  return (r0 & reg ## _ ## field ## _value_mask0) | (r1 & reg ## _ ## field ## _value_mask1); \
 }\
 inline type get_ ## reg ## _value_ ## field (reg_type val) \
 { \
@@ -412,7 +391,13 @@ enum reg_name ## _bits \
 #define expand_define_reg(reg_name, reg_raw_type, ...) \
   expand_reg_bits_enum (reg_name, reg_raw_type, __VA_ARGS__) \
   pp_for_each_i (expand_reg_bits_funcs, (reg_name, reg_raw_type), __VA_ARGS__) \
-  inline reg_raw_type make_ ## reg_name ## _raw_reg_value (reg_raw_type v) { return v; }
+  inline reg_raw_type make_ ## reg_name ## _raw_reg_value (reg_raw_type v) { return v; } \
+  inline reg_raw_type get_ ## reg_name ## _value_raw_reg_value (reg_raw_type v) { return v; }
+
+// FIXME: 'get_ ## reg_name ## _value_raw_reg_value' above is only for backwards compatibility
+//        for get_reg (REG, raw_reg_value) and so on.
+//        the special 'raw_reg_value' field is deprecated.  raw reg values can be get/set
+//        by providing the value directly.
 
 // expand '(name, value)' or 'value' that came from
 //     reset_reg (field, value)
@@ -494,7 +479,7 @@ enum reg_name ## _bits \
 #define set_reg(reg_arg, ...) reg_arg_dispatch (set_reg_plain, set_reg_inst, reg_arg, __VA_ARGS__)
 
 
-#define get_reg_plain_n__1(reg,field,...) get_ ## reg ## _ ## field ()
+#define get_reg_plain_n__1(reg,field,...) get_ ## reg ## _value_ ## field (get_ ## reg ## _raw_reg_value ())
 #define get_reg_plain_n__0(reg,...) get_ ## reg ## _raw_reg_value ()
 #define get_reg_plain_n_(n, ...) get_reg_plain_n__ ## n (__VA_ARGS__)
 #define get_reg_plain_n(n, ...) get_reg_plain_n_(n, __VA_ARGS__)
