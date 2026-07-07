@@ -29,9 +29,57 @@ reg_def_inline uint32_t get_ ## reg_name ## _raw_reg_value (void) { return *(vol
 reg_def_inline void rmw_ ## reg_name(uint32_t a, uint32_t o) { *(volatile uint32_t*)addr = ((*(volatile uint32_t*)addr) & a) | o; } \
 expand_define_reg(reg_name, uint32_t, __VA_ARGS__)
 
+// read-only memory mapped 32-bit register.  only a getter is generated, since
+// writing a read-only register makes no sense (e.g. an input capture register).
+#define mem_reg32_ro(reg_name, addr, ...) \
+enum { reg_name ## _ADDR = addr }; \
+reg_def_inline uint32_t get_ ## reg_name ## _raw_reg_value (void) { return *(volatile uint32_t*)addr; } \
+expand_define_reg(reg_name, uint32_t, __VA_ARGS__)
 
 // ------------------------------------------------------------------------
-// SH7091 TMU0 register description
+// multi-instance memory mapped register access.
+//
+// several device instances share the same register layout but live at
+// 'base + instance * stride'.  these macros emit the '_1' low level accessors
+// that reg_def.h dispatches to for the '(reg_name, instance)' tuple form, with
+// the instance passed through as the channel index.
+
+#define mem_reg16_n(reg_name, base, stride, ...) \
+enum { reg_name ## _ADDR = base, reg_name ## _STRIDE = stride }; \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value_1 (unsigned inst, uint16_t v) { *(volatile uint16_t*)(uintptr_t)((base) + (inst) * (stride)) = v; } \
+reg_def_inline uint16_t get_ ## reg_name ## _raw_reg_value_1 (unsigned inst) { return *(volatile uint16_t*)(uintptr_t)((base) + (inst) * (stride)); } \
+reg_def_inline void rmw_ ## reg_name ## _1 (unsigned inst, uint16_t a, uint16_t o) { volatile uint16_t* p = (volatile uint16_t*)(uintptr_t)((base) + (inst) * (stride)); *p = (*p & a) | o; } \
+expand_define_reg(reg_name, uint16_t, __VA_ARGS__)
+
+#define mem_reg32_n(reg_name, base, stride, ...) \
+enum { reg_name ## _ADDR = base, reg_name ## _STRIDE = stride }; \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value_1 (unsigned inst, uint32_t v) { *(volatile uint32_t*)(uintptr_t)((base) + (inst) * (stride)) = v; } \
+reg_def_inline uint32_t get_ ## reg_name ## _raw_reg_value_1 (unsigned inst) { return *(volatile uint32_t*)(uintptr_t)((base) + (inst) * (stride)); } \
+reg_def_inline void rmw_ ## reg_name ## _1 (unsigned inst, uint32_t a, uint32_t o) { volatile uint32_t* p = (volatile uint32_t*)(uintptr_t)((base) + (inst) * (stride)); *p = (*p & a) | o; } \
+expand_define_reg(reg_name, uint32_t, __VA_ARGS__)
+
+
+// ------------------------------------------------------------------------
+// SH7091 TMU (timer unit) register description  (hardware manual section 12)
+//
+// the TMU has three 32-bit auto-reload timer channels.  each channel has a
+// timer constant register (TCOR), a timer counter (TCNT) and a timer control
+// register (TCR), laid out at 'base + channel * 0x0C':
+//
+//   channel   TCOR         TCNT         TCR
+//   0         0xFFD80008   0xFFD8000C   0xFFD80010
+//   1         0xFFD80014   0xFFD80018   0xFFD8001C
+//   2         0xFFD80020   0xFFD80024   0xFFD80028
+//
+// TCOR and TCNT are identical across all channels, so they are described once
+// and accessed per channel via the '(reg, channel)' tuple form, e.g.
+// 'get_reg ((TCNT, 1))'.
+//
+// TCR channels 0 and 1 share a layout; channel 2's TCR additionally has the
+// input capture flag (ICPF) and control (ICPE) bits.  channel 2 therefore has
+// its own dedicated 'TCR2' definition (its counter / constant still use the
+// shared '(TCOR, 2)' / '(TCNT, 2)').  channel 2 also has the read-only input
+// capture register TCPR2 at 0xFFD8002C.
 
 mem_reg8 (TOCR, 0xFFD80000
   , reg_bits (reserved, 7, 1, uint8_t)
@@ -45,11 +93,12 @@ mem_reg8 (TSTR, 0xFFD80004
   , reg_bits (str0, 0, 0, bool)
 )
 
-mem_reg32 (TCOR0, 0xFFD80008
+// TCOR / TCNT: same layout on all three channels -> multi-instance access.
+mem_reg32_n (TCOR, 0xFFD80008, 0x0C
   , reg_bits (value, 31, 0, uint32_t)
 )
 
-mem_reg32 (TCNT0, 0xFFD8000C
+mem_reg32_n (TCNT, 0xFFD8000C, 0x0C
   , reg_bits (value, 31, 0, uint32_t)
 )
 
@@ -72,15 +121,38 @@ enum tcr_tpsc_t
   tpsc_ext_clock = 0b111
 };
 
-mem_reg16 (TCR0, 0xFFD80010
+// input capture control (TCR2 channel 2 only).  0b01 is reserved.
+enum tcr_icpe_t
+{
+  icpe_input_capture_disabled = 0b00,
+  icpe_input_capture_no_interrupt = 0b10,
+  icpe_input_capture_interrupt = 0b11
+};
+
+// TCR channels 0 and 1 -> multi-instance access via '(TCR, 0)' / '(TCR, 1)'.
+mem_reg16_n (TCR, 0xFFD80010, 0x0C
   , reg_bits (reserved0, 15, 9, uint8_t)
   , reg_bits (unf, 8, 8, bool)
   , reg_bits (reserved1, 7, 6, uint8_t)
   , reg_bits (unie, 5, 5, bool)
-  
   , reg_bits (ckeg1, 4, 3, enum tcr_ckeg_t)
-
   , reg_bits (tpsc2, 2, 0, enum tcr_tpsc_t)
+)
+
+// TCR channel 2: adds the input capture flag / control bits.
+mem_reg16 (TCR2, 0xFFD80028
+  , reg_bits (reserved0, 15, 10, uint8_t)
+  , reg_bits (icpf, 9, 9, bool)
+  , reg_bits (unf, 8, 8, bool)
+  , reg_bits (icpe1, 7, 6, enum tcr_icpe_t)
+  , reg_bits (unie, 5, 5, bool)
+  , reg_bits (ckeg1, 4, 3, enum tcr_ckeg_t)
+  , reg_bits (tpsc2, 2, 0, enum tcr_tpsc_t)
+)
+
+// TCPR2 channel 2 input capture register (read only).
+mem_reg32_ro (TCPR2, 0xFFD8002C
+  , reg_bits (value, 31, 0, uint32_t)
 )
 
 // ------------------------------------------------------------------------
@@ -150,10 +222,51 @@ wdt_reg8 (WTCSR, 0xFFC0000C, 0xA500
 // ------------------------------------------------------------------------
 // example
 
-void start_tmu0 (uint32_t count)
+// configure and start any of the three TMU channels.  the channel is passed
+// as the instance value of the '(reg, channel)' tuple, so the same code drives
+// all three timers.
+void start_tmu (unsigned ch, uint32_t count)
 {
-  reset_reg (TCNT0, (value, count));
-  set_reg (TSTR, (str0, true));
+  set_reg ((TCR, ch),
+    (tpsc2, tpsc_p_256),
+    (unie, true)
+  );
+  reset_reg ((TCOR, ch), (value, count));   // auto-reload value
+  reset_reg ((TCNT, ch), (value, count));   // initial counter value
+
+  // start channel 'ch' by setting its STR bit in TSTR without disturbing the
+  // other channels.
+  rmw_reg (TSTR, TSTR_all_bits, 1u << ch);
+}
+
+// set up channel 2 to capture TCNT2 into TCPR2 on the rising edge of the
+// external TCLK signal.
+void start_tmu2_input_capture (uint32_t reload)
+{
+  reset_reg (TOCR, (tcoe, false));          // TCLK = input capture control input
+
+  reset_reg ((TCOR, 2), (value, reload));
+  reset_reg ((TCNT, 2), (value, reload));
+
+  reset_reg (TCR2,
+    (tpsc2, tpsc_ext_clock),
+    (ckeg1, ckeg_count_capture_rising_edge),
+    (icpe1, icpe_input_capture_no_interrupt),
+    (unie,  false)
+  );
+
+  rmw_reg (TSTR, TSTR_all_bits, 1u << 2);   // start channel 2
+}
+
+uint32_t read_tmu2_capture (void)
+{
+  return get_reg (TCPR2);
+}
+
+// read a field of a given channel's control register via the tuple form.
+bool tmu_underflowed (unsigned ch)
+{
+  return get_reg ((TCR, ch), unf);
 }
 
 void start_wdt (void)
