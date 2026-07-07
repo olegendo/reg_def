@@ -279,7 +279,16 @@ instance parameter is whatever the user picks:
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "pp_for_each.h"
+// pp_for_each.h transitively provides pp_utils.h + pp_args.h.
+// By default, the bundled headers in reg_def_pp_utils/ are used.
+// To use user supplied headers define REG_DEF_PP_FOR_EACH_H to its header
+// file name, e.g. by adding the following compiler flag:
+//    -DREG_DEF_PP_FOR_EACH_H='"utils/pp_for_each.h"'
+//
+#ifndef REG_DEF_PP_FOR_EACH_H
+#  define REG_DEF_PP_FOR_EACH_H "reg_def_pp_utils/pp_for_each.h"
+#endif
+#include REG_DEF_PP_FOR_EACH_H
 
 // inline storage class for the per-field helpers and the user-supplied
 // raw_reg_value / rmw functions in device-specific macros.
@@ -541,33 +550,5 @@ enum reg_name ## _bits \
 #define set_reg_value(val, reg, ...) \
   do { val = (val & ~(0u pp_for_each_i (expand_set_multi_get_mask, reg, __VA_ARGS__))) \
              | (0u pp_for_each_i (expand_set_all, reg, __VA_ARGS__)); } while (0)
-
-
-#if 0
-// FIXME: problem of nested expansion of pp_for_each / pp_for_each_i
-// for some weird reason, the nested pp_for_each_i that comes out of 'reset_reg'
-// it seems to be related to the way arguments are expanded and concatenated.
-// if a pp_for_each_i is used with all the macros named differently (e.g. prefixed with '_')
-// the nested expansion works as expected.
-
-// because of that, 'combined_reg' is not useful at the moment.
-// perhaps the better way to solve this is with an external code generator tool.
-
-#define expand_set_combined_subreg_3(f,g,reg_name, field_name, ...) pp_concat (f, g) (reg_name, (field_name, __VA_ARGS__))
-
-#define expand_set_combined_subreg_2(val_type, val, high_bit, low_bit, set_or_reset_cmd, reg_name, field_name)\
-  expand_set_combined_subreg_3 (set_or_reset_cmd, _reg, reg_name, field_name, (val >> low_bit) & bit_count_to_mask(val_type, high_bit - low_bit + 1));
-
-#define expand_set_combined_subreg_1(...) expand_set_combined_subreg_2(__VA_ARGS__)
-#define expand_set_combined_subreg__(...) __VA_ARGS__
-#define expand_set_combined_subreg(val_type, subreg) expand_set_combined_subreg_1(expand_set_combined_subreg__ val_type, expand_set_combined_subreg__ subreg)
-
-#define combined_reg(reg_name, raw_reg_type, field, ...) \
-reg_def_inline void set_ ## reg_name ## _raw_reg_value (raw_reg_type val) \
-{ \
-  _pp_for_each_i (expand_set_combined_subreg, (raw_reg_type, val), __VA_ARGS__) \
-}
-#endif
-
 
 #endif // includeguard_reg_def_h_includeguard
