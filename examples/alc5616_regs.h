@@ -18,9 +18,9 @@
 
 #define alc5616_reg16(reg_name, addr, ...)\
 enum { reg_name##_ADDR = addr }; \
-inline void set_ ## reg_name ## _raw_reg_value (uint16_t v) { alc5616_write_reg16 (addr, v); } \
-inline uint16_t get_ ## reg_name ## _raw_reg_value (void) { return alc5616_read_reg16 (addr); } \
-inline void rmw_ ## reg_name (uint16_t a, uint16_t o) { alc5616_write_reg16 (addr, (alc5616_read_reg16 (addr) & a) | o); } \
+reg_def_inline void set_ ## reg_name ## _raw_reg_value (uint16_t v) { alc5616_write_reg16 (addr, v); } \
+reg_def_inline uint16_t get_ ## reg_name ## _raw_reg_value (void) { return alc5616_read_reg16 (addr); } \
+reg_def_inline void rmw_ ## reg_name (uint16_t a, uint16_t o) { alc5616_write_reg16 (addr, (alc5616_read_reg16 (addr) & a) | o); } \
 expand_define_reg(reg_name, uint16_t, __VA_ARGS__)
 
 
@@ -29,17 +29,17 @@ alc5616_reg16 (ALC5616_MX6C_PR_DATA, 0x6C)
 
 #define alc5616_pr_reg16(reg_name, addr, ...)\
 enum { reg_name##_ADDR = addr }; \
-inline void set_ ## reg_name ## _raw_reg_value (uint16_t v)\
+reg_def_inline void set_ ## reg_name ## _raw_reg_value (uint16_t v)\
 {\
   reset_reg (ALC5616_MX6A_PR_INDEX, (raw_reg_value, addr)); \
   reset_reg (ALC5616_MX6C_PR_DATA, (raw_reg_value, v)); \
 }\
-inline uint16_t get_ ## reg_name ## _raw_reg_value (void)\
+reg_def_inline uint16_t get_ ## reg_name ## _raw_reg_value (void)\
 {\
   reset_reg (ALC5616_MX6A_PR_INDEX, (raw_reg_value, addr)); \
   return get_reg (ALC5616_MX6C_PR_DATA); \
 }\
-inline void rmw_ ## reg_name (uint16_t a, uint16_t o)\
+reg_def_inline void rmw_ ## reg_name (uint16_t a, uint16_t o)\
 {\
   reset_reg (ALC5616_MX6A_PR_INDEX, (raw_reg_value, addr)); \
   uint16_t v = get_reg (ALC5616_MX6C_PR_DATA); \
@@ -52,8 +52,6 @@ inline void rmw_ ## reg_name (uint16_t a, uint16_t o)\
 expand_define_reg(reg_name, uint16_t, __VA_ARGS__)
 
 
-
-// seems writing 0x0020 and 0x0000 does a device soft-reset ...
 alc5616_reg16 (ALC5616_MX00_SW_RESET, 0x00)
 
 alc5616_reg16 (ALC5616_MX02_HPOUT, 0x02,

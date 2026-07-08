@@ -1,3 +1,4 @@
+// gcc -O2 example.c -I./../
 
 #include <stdio.h>
 #include <stdlib.h>
