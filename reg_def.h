@@ -300,11 +300,18 @@ instance parameter is whatever the user picks:
 //
 //   GCC:   plain 'inline' (C99) inlines at the call site but does NOT emit
 //          an out-of-line definition unless backed by a separate 'extern
-//          inline' declaration.  at -O0 nothing is inlined, so unresolved
-//          calls hit the linker.  'static inline' inlines if able, otherwise
-//          emits a private per-TU copy that the linker drops if unused.
+//          inline' declaration.  at -O0 nothing is inlined, and at -Os a
+//          call might not be inlined either, so unresolved calls hit the
+//          linker.  'static inline' inlines if able.  only a TU with a call
+//          that was not inlined (or that takes the function's address) gets
+//          a private copy, an unused 'static inline' function emits nothing.
 //          prefer 'static inline' so each TU is self-contained at any
 //          optimization level.
+//
+//   C++:   plain 'inline' functions have external linkage.  a TU that needs
+//          an out-of-line copy emits one in a section that the linker
+//          de-duplicates. an unused function doesn#t emit anything.
+//          prefer plain 'inline' in this case.
 //
 // device-specific macros (e.g. aw9523b_reg8, mem_reg8, ...) should also use
 // reg_def_inline for the symbols they mint, so the same compile guarantees
